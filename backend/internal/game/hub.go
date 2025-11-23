@@ -1,0 +1,506 @@
+package game
+
+import (
+	"encoding/json"
+	"log"
+	"time"
+
+	"github.com/gameoflife0880/web_minesweeper/backend/pkg"
+)
+
+// NewGameHub creates and initializes a new game hub with a fresh game board
+func NewGameHub() *GameHub {
+	gameBoard := GenerateGameBoard()
+
+	hub := &GameHub{
+		GameBoard: *gameBoard,
+		Clients:   make(map[string]*Client),
+		Players:   make(map[string]*Player),
+
+		Register:          make(chan *Client),
+		Unregister:        make(chan *Client),
+		CellActionChannel: make(chan CellAction),
+		Broadcast:         make(chan []byte, 256), // Buffered to prevent blocking
+
+		ScanTicker: time.NewTicker(SCAN_INTERVAL),
+		StartTime:  time.Now().Unix(),
+		GameStatus: InProgress,
+		shutdown:   make(chan struct{}),
+	}
+
+	return hub
+}
+
+// Run starts the game hub's main event loop, handling client registration,
+// cell actions, scan events, and broadcasts
+func (h *GameHub) Run() {
+	defer func() {
+		h.ScanTicker.Stop()
+
+		log.Println("GameHub stopped")
+	}()
+
+	for {
+		select {
+		case <-h.shutdown:
+			return
+		case client := <-h.Register:
+			h.BoardLock.Lock()
+			h.Clients[client.PlayerID] = client
+			h.Players[client.PlayerID] = &Player{
+				PlayerID:   client.PlayerID,
+				PlayerName: pkg.GenerateNickname(),
+			}
+
+			scoreboardUpdates := map[string]ScoreboardAction{
+				"scoreboardUpdates": {
+					Type:   "REGISTER",
+					Player: *h.Players[client.PlayerID],
+				},
+			}
+			h.BroadcastUpdates("REGISTER", scoreboardUpdates)
+
+			payload := h.GetGameBoardState()
+			gameBoardState := map[string]any{
+				"type":    "GAMEBOARD_STATE",
+				"payload": payload,
+			}
+			if jsonGameBoardState, err := json.Marshal(gameBoardState); err != nil {
+				log.Printf("Failed to marshal game board state for player %s: %v", client.PlayerID, err)
+			} else {
+				select {
+				case client.Send <- jsonGameBoardState:
+				default:
+					log.Printf("Failed to send game board state to player %s: channel full", client.PlayerID)
+				}
+			}
+			h.BoardLock.Unlock()
+			log.Printf("Player %s joined. Total players: %d", client.PlayerID, len(h.Players))
+		case client := <-h.Unregister:
+			h.BoardLock.Lock()
+			if _, ok := h.Clients[client.PlayerID]; ok {
+				// Check if player exists before accessing
+				if player, playerExists := h.Players[client.PlayerID]; playerExists {
+					scoreboardUpdates := map[string]ScoreboardAction{
+						"scoreboardUpdates": {
+							Type:   "UNREGISTER",
+							Player: *player,
+						},
+					}
+
+					h.BroadcastUpdates("UNREGISTER", scoreboardUpdates)
+				}
+
+				delete(h.Players, client.PlayerID)
+				delete(h.Clients, client.PlayerID)
+				close(client.Send)
+			}
+			h.BoardLock.Unlock()
+			log.Printf("Player %s left. Total players: %d", client.PlayerID, len(h.Players))
+		case cellAction := <-h.CellActionChannel:
+			if h.GameStatus != InProgress {
+				continue
+			}
+			h.BoardLock.Lock()
+			updates := h.HandleCellAction(cellAction)
+			h.BroadcastUpdates("CELL", updates)
+
+			h.CheckWinCondition()
+
+			h.BoardLock.Unlock()
+		case <-h.ScanTicker.C:
+			if h.GameStatus != InProgress {
+				continue
+			}
+
+			h.BoardLock.Lock()
+
+			updates := h.HandleScanAction()
+
+			h.BroadcastUpdates("SCAN", updates)
+
+			h.CheckWinCondition()
+
+			h.BoardLock.Unlock()
+		case message := <-h.Broadcast:
+			h.BoardLock.RLock()
+			// Create a copy of clients to avoid holding lock while sending
+			clients := make([]*Client, 0, len(h.Clients))
+			for _, c := range h.Clients {
+				clients = append(clients, c)
+			}
+			h.BoardLock.RUnlock()
+
+			// Send messages without holding the lock to avoid deadlocks
+			for _, c := range clients {
+				select {
+				case c.Send <- message:
+				default:
+					log.Printf("Failed to send message to %s", c.PlayerID)
+					// Unregister in a non-blocking way
+					select {
+					case h.Unregister <- c:
+					default:
+						log.Printf("Failed to unregister client %s: channel full", c.PlayerID)
+					}
+				}
+			}
+		}
+	}
+}
+
+// BroadcastUpdates serializes and broadcasts updates to all connected clients
+func (h *GameHub) BroadcastUpdates(actionType string, payload any) {
+	if actionType == "" || payload == nil {
+		return
+	}
+
+	jsonUpdates, err := json.Marshal(map[string]any{
+		"type":    actionType,
+		"payload": payload,
+	})
+	if err != nil {
+		log.Printf("BroadcastUpdates: failed to marshal updates: %v", err)
+		return
+	}
+
+	select {
+	case h.Broadcast <- jsonUpdates:
+	default:
+		log.Printf("BroadcastUpdates: channel full, dropping message type: %s", actionType)
+	}
+}
+
+func (h *GameHub) HandleCellAction(action CellAction) map[string][]any {
+	if !isValidCoordinate(action.X, action.Y) {
+		return map[string][]any{
+			"outOfBoard": nil,
+		}
+	}
+
+	var updates *UpdateResult
+
+	switch action.Type {
+	case "REVEAL":
+		updates = h.CellReveal(action.X, action.Y, action.PlayerID)
+	case "FLAG":
+		updates = h.CellFlag(action.X, action.Y, action.PlayerID)
+	default:
+		return newUpdateResult().toMap()
+	}
+
+	if updates == nil {
+		return newUpdateResult().toMap()
+	}
+
+	return updates.toMap()
+}
+
+func (h *GameHub) CellReveal(x int, y int, playerID string) *UpdateResult {
+	if h.GameBoard.Cells[x][y].IsRevealed || h.GameBoard.Cells[x][y].FlagState != Empty {
+		return nil
+	}
+
+	player, exists := h.Players[playerID]
+	if !exists {
+		return newUpdateResult()
+	}
+
+	if h.GameBoard.Cells[x][y].IsMine {
+		return h.handleMineHit(x, y, playerID, player)
+	}
+
+	return h.CellFloodReveal(x, y, playerID)
+}
+
+func (h *GameHub) handleMineHit(x, y int, playerID string, player *Player) *UpdateResult {
+	updates := newUpdateResult()
+
+	h.GameBoard.Cells[x][y].IsRevealed = true
+
+	player.TotalMineHits += 1
+	applyScorePenalty(player, MINE_HIT_PENALTY)
+
+	updates.CellUpdates = append(updates.CellUpdates, CellAction{
+		Type:     "HIT",
+		X:        x,
+		Y:        y,
+		PlayerID: playerID,
+		Cell:     h.GameBoard.Cells[x][y],
+	})
+	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+		Type:     "SCORE",
+		Value:    -MINE_HIT_PENALTY,
+		PlayerID: playerID,
+	})
+	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+		Type:     "MINE_HIT_INCREMENT",
+		PlayerID: playerID,
+	})
+
+	return updates
+}
+
+func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
+	updates := newUpdateResult()
+
+	if !isValidCoordinate(x, y) || h.GameBoard.Cells[x][y].IsRevealed || h.GameBoard.Cells[x][y].IsMine {
+		return updates
+	}
+
+	player, exists := h.Players[playerID]
+	if !exists {
+		return updates
+	}
+
+	queue := [][]int{{x, y}}
+	scoreIncrement := 0
+
+	// Process initial cell
+	h.GameBoard.Cells[x][y].IsRevealed = true
+	if h.GameBoard.CellsToReveal > 0 {
+		h.GameBoard.CellsToReveal -= 1
+	}
+	score := calculateScore(h.GameBoard.Cells[x][y].AdjacentMines)
+	player.Score += score
+	scoreIncrement += score
+
+	updates.CellUpdates = append(updates.CellUpdates, CellAction{
+		Type:     "REVEALED",
+		X:        x,
+		Y:        y,
+		PlayerID: playerID,
+		Cell:     h.GameBoard.Cells[x][y],
+	})
+
+	// Process queue
+	for len(queue) > 0 {
+		cell := queue[0]
+		queue = queue[1:]
+		cellX, cellY := cell[0], cell[1]
+
+		if h.GameBoard.Cells[cellX][cellY].AdjacentMines == 0 {
+			// Check all neighbors
+			for oX := -1; oX <= 1; oX++ {
+				for oY := -1; oY <= 1; oY++ {
+					if oX == 0 && oY == 0 {
+						continue
+					}
+					neighborX := cellX + oX
+					neighborY := cellY + oY
+
+					if isValidCoordinate(neighborX, neighborY) &&
+						!h.GameBoard.Cells[neighborX][neighborY].IsRevealed &&
+						!h.GameBoard.Cells[neighborX][neighborY].IsMine &&
+						h.GameBoard.Cells[neighborX][neighborY].FlagState == Empty {
+						h.GameBoard.Cells[neighborX][neighborY].IsRevealed = true
+						if h.GameBoard.CellsToReveal > 0 {
+							h.GameBoard.CellsToReveal -= 1
+						}
+						score := calculateScore(h.GameBoard.Cells[neighborX][neighborY].AdjacentMines)
+						player.Score += score
+						scoreIncrement += score
+
+						updates.CellUpdates = append(updates.CellUpdates, CellAction{
+							Type:     "REVEALED",
+							X:        neighborX,
+							Y:        neighborY,
+							PlayerID: playerID,
+							Cell:     h.GameBoard.Cells[neighborX][neighborY],
+						})
+
+						if h.GameBoard.Cells[neighborX][neighborY].AdjacentMines == 0 {
+							queue = append(queue, []int{neighborX, neighborY})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if scoreIncrement > 0 {
+		updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+			Type:     "SCORE",
+			Value:    scoreIncrement,
+			PlayerID: playerID,
+		})
+	}
+
+	return updates
+}
+
+func (h *GameHub) CellFlag(x int, y int, playerID string) *UpdateResult {
+	if !isValidCoordinate(x, y) {
+		return nil
+	}
+
+	if h.GameBoard.Cells[x][y].IsRevealed || h.GameBoard.Cells[x][y].FlagState == Validated {
+		return nil
+	}
+
+	player, exists := h.Players[playerID]
+	if !exists {
+		return newUpdateResult()
+	}
+
+	updates := newUpdateResult()
+	cell := &h.GameBoard.Cells[x][y]
+
+	switch cell.FlagState {
+	case Empty:
+		if player.ActiveFlagCount >= ACTIVE_FLAG_LIMIT {
+			return updates
+		}
+		cell.FlagState = Placed
+		cell.FlagOwnerID = playerID
+		player.ActiveFlagCount += 1
+		updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+			Type:     "FLAG_INCREMENT",
+			PlayerID: playerID,
+		})
+	case Placed:
+		if cell.FlagOwnerID != playerID {
+			return updates
+		}
+		cell.FlagState = Empty
+		cell.FlagOwnerID = ""
+		player.ActiveFlagCount -= 1
+		updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+			Type:     "FLAG_DECREMENT",
+			PlayerID: playerID,
+		})
+	default:
+		return updates
+	}
+
+	updates.CellUpdates = append(updates.CellUpdates, CellAction{
+		Type:     "FLAG",
+		X:        x,
+		Y:        y,
+		PlayerID: playerID,
+		Cell:     *cell,
+	})
+
+	return updates
+}
+
+func (h *GameHub) GetGameBoardState() *GameBoard {
+	gameBoardState := &GameBoard{}
+	cells := make([][]Cell, GAMEBOARD_SIZE)
+
+	for i := range cells {
+		cells[i] = make([]Cell, GAMEBOARD_SIZE)
+	}
+
+	for i := range GAMEBOARD_SIZE {
+		for j := range GAMEBOARD_SIZE {
+			if h.GameBoard.Cells[i][j].IsRevealed {
+				cells[i][j] = h.GameBoard.Cells[i][j]
+			} else {
+				if h.GameBoard.Cells[i][j].FlagState != Empty {
+					cells[i][j].FlagState = h.GameBoard.Cells[i][j].FlagState
+				}
+			}
+		}
+	}
+
+	gameBoardState.GameConstants = GameConstants{
+		GameStartTime:      h.StartTime,
+		GameBoardSize:      GAMEBOARD_SIZE,
+		MinesMultiplier:    MINES_MULTIPLIER,
+		ScanInterval:       int(SCAN_INTERVAL.Seconds()),
+		RevealReward:       REVEAL_REWARD,
+		FlagValidateReward: FLAG_VALIDATE_REWARD,
+		FlagBadPenalty:     FLAG_BAD_PENALTY,
+		MineHitPenalty:     MINE_HIT_PENALTY,
+		ActiveFlagLimit:    ACTIVE_FLAG_LIMIT,
+	}
+	gameBoardState.Cells = cells
+	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
+
+	return gameBoardState
+}
+
+func (h *GameHub) HandleScanAction() map[string][]any {
+	updates := newUpdateResult()
+
+	for i := range GAMEBOARD_SIZE {
+		for j := range GAMEBOARD_SIZE {
+			cell := &h.GameBoard.Cells[i][j]
+			if cell.FlagState != Placed {
+				continue
+			}
+
+			player, exists := h.Players[cell.FlagOwnerID]
+			if !exists {
+				continue
+			}
+
+			if cell.IsMine {
+				h.handleFlagValidated(i, j, player, updates)
+			} else {
+				h.handleFlagInvalid(i, j, player, updates)
+			}
+		}
+	}
+
+	return updates.toMap()
+}
+
+func (h *GameHub) handleFlagValidated(x, y int, player *Player, updates *UpdateResult) {
+	cell := &h.GameBoard.Cells[x][y]
+	cell.FlagState = Validated
+	player.Score += FLAG_VALIDATE_REWARD
+	player.ActiveFlagCount -= 1
+
+	updates.CellUpdates = append(updates.CellUpdates, CellAction{
+		Type: "FLAG_VALIDATED",
+		X:    x,
+		Y:    y,
+		Cell: *cell,
+	})
+	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+		Type:     "SCORE",
+		Value:    FLAG_VALIDATE_REWARD,
+		PlayerID: player.PlayerID,
+	})
+	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+		Type:     "FLAG_DECREMENT",
+		PlayerID: player.PlayerID,
+	})
+}
+
+func (h *GameHub) handleFlagInvalid(x, y int, player *Player, updates *UpdateResult) {
+	cell := &h.GameBoard.Cells[x][y]
+	cell.FlagState = Empty
+	applyScorePenalty(player, FLAG_BAD_PENALTY)
+	player.ActiveFlagCount -= 1
+
+	updates.CellUpdates = append(updates.CellUpdates, CellAction{
+		Type: "FLAG",
+		X:    x,
+		Y:    y,
+		Cell: *cell,
+	})
+	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+		Type:     "SCORE",
+		Value:    -FLAG_BAD_PENALTY,
+		PlayerID: player.PlayerID,
+	})
+}
+
+func (h *GameHub) CheckWinCondition() {
+	if h.GameBoard.CellsToReveal == 0 {
+		h.GameStatus = Ended
+		h.BroadcastUpdates("GAME_STATUS", map[string]string{
+			"status": "ended",
+		})
+
+		log.Println("Game ended")
+	}
+}
+
+// Shutdown returns the shutdown channel for graceful shutdown
+func (h *GameHub) Shutdown() chan struct{} {
+	return h.shutdown
+}

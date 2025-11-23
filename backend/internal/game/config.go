@@ -1,0 +1,16 @@
+package game
+
+import "time"
+
+const (
+	GAMEBOARD_SIZE   = 10
+	MINES_MULTIPLIER = 0.1
+	SCAN_INTERVAL    = time.Second * 10
+
+	REVEAL_REWARD        = 1
+	FLAG_VALIDATE_REWARD = 500
+	FLAG_BAD_PENALTY     = 1000
+	MINE_HIT_PENALTY     = 1000
+
+	ACTIVE_FLAG_LIMIT = 5
+)

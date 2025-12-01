@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import Cell, { type CellData } from './Cell';
 import Scoreboard, { type Player } from './Scoreboard';
+import GameStatusOverlay from './GameStatusOverlay';
 import './GameBoard.css';
 
 const GameStatus = {
@@ -101,8 +102,9 @@ const GameBoard = () => {
 
                                     // Create a deep copy of the cells array
                                     const newCells = prevState.cells.map(row => [...row]);
+                                    let cellsRevealedCount = 0;
 
-                                    // Apply each cell update
+                                    // Apply each cell update and track revealed changes
                                     payload.cellUpdates.forEach((cellUpdate: CellUpdate) => {
                                         const { x, y, cell } = cellUpdate;
                                         
@@ -113,6 +115,13 @@ const GameBoard = () => {
                                             y >= 0 && 
                                             y < newCells[x]?.length
                                         ) {
+                                            const oldCell = newCells[x][y];
+                                            
+                                            // Count cells that changed from unrevealed to revealed and are not mines
+                                            if (!oldCell.isRevealed && cell.isRevealed && !cell.isMine) {
+                                                cellsRevealedCount++;
+                                            }
+                                            
                                             // Update the cell at the specified coordinates
                                             newCells[x][y] = {
                                                 isRevealed: cell.isRevealed,
@@ -124,9 +133,13 @@ const GameBoard = () => {
                                         }
                                     });
 
+                                    // Update cellsToReveal incrementally based on actual changes
+                                    const newCellsToReveal = Math.max(0, prevState.cellsToReveal - cellsRevealedCount);
+
                                     return {
                                         ...prevState,
                                         cells: newCells,
+                                        cellsToReveal: newCellsToReveal,
                                     };
                                 });
                             }
@@ -243,8 +256,21 @@ const GameBoard = () => {
         ));
     }, [gameboardState.cells, handleCellClick, handleCellRightClick]);
 
+    // Extract game constants safely
+    const gameStartTime = gameboardState.gameConstants?.gameStartTime as number | undefined;
+    const gameBoardSize = gameboardState.gameConstants?.gameBoardSize as number | undefined;
+    const revealReward = gameboardState.gameConstants?.revealReward as number | undefined;
+    const mineHitPenalty = gameboardState.gameConstants?.mineHitPenalty as number | undefined;
+
     return (
         <div className="game-board-container">
+            <GameStatusOverlay
+                gameStartTime={gameStartTime}
+                gameBoardSize={gameBoardSize}
+                cellsToReveal={gameboardState.cellsToReveal}
+                revealReward={revealReward}
+                mineHitPenalty={mineHitPenalty}
+            />
             <Scoreboard players={players} />
             {/* Game content - always rendered, not blocked by connection status */}
             {cellsRender ? (

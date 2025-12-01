@@ -1,0 +1,41 @@
+.game-status-overlay {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  color: white;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.game-status-overlay div {
+  margin: 0;
+  padding: 0;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.status-value {
+  font-weight: 500;
+}
+
+.status-time {
+  color: #fbbf24; /* blends with background gradient (#667eea to #764ba2), highly readable with text shadow */
+}
+
+.status-size {
+  color: #87ddff; /* green */
+}
+
+.status-cells {
+  color: #ebff15; /* yellow/amber */
+}
+
+.status-reward {
+  color: #34d399; /* emerald green */
+}
+
+.status-penalty {
+  color: #f87171; /* red */
+}
+

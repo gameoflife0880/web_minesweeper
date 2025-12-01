@@ -5,7 +5,6 @@ import (
 )
 
 func GenerateGameBoard() *GameBoard {
-	//Init
 	cells := make([][]Cell, GAMEBOARD_SIZE)
 
 	for i := range cells {
@@ -17,7 +16,6 @@ func GenerateGameBoard() *GameBoard {
 		CellsToReveal: GAMEBOARD_SIZE * GAMEBOARD_SIZE,
 	}
 
-	//Spawn mines
 	minesSpawned := 0
 	for i := range GAMEBOARD_SIZE {
 		for j := range GAMEBOARD_SIZE {
@@ -30,7 +28,6 @@ func GenerateGameBoard() *GameBoard {
 
 	gameBoard.CellsToReveal -= minesSpawned
 
-	// Calculate adjacent mines
 	for i := range GAMEBOARD_SIZE {
 		for j := range GAMEBOARD_SIZE {
 			gameBoard.Cells[i][j].AdjacentMines = CalculateAdjacentMines(gameBoard, i, j)

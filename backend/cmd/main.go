@@ -29,7 +29,6 @@ func main() {
 		Handler: nil,
 	}
 
-	// Start server in a goroutine
 	go func() {
 		log.Printf("Starting HTTP server on: %s", PORT)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -37,14 +36,12 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("Shutting down server...")
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -52,7 +49,6 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
-	// Signal hub to shutdown
 	close(hub.Shutdown())
 
 	log.Println("Server exited")

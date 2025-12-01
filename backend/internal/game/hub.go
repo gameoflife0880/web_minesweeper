@@ -8,7 +8,6 @@ import (
 	"github.com/gameoflife0880/web_minesweeper/backend/pkg"
 )
 
-// NewGameHub creates and initializes a new game hub with a fresh game board
 func NewGameHub() *GameHub {
 	gameBoard := GenerateGameBoard()
 
@@ -31,8 +30,6 @@ func NewGameHub() *GameHub {
 	return hub
 }
 
-// Run starts the game hub's main event loop, handling client registration,
-// cell actions, and broadcasts
 func (h *GameHub) Run() {
 	defer func() {
 		log.Println("GameHub stopped")
@@ -77,7 +74,6 @@ func (h *GameHub) Run() {
 		case client := <-h.Unregister:
 			h.BoardLock.Lock()
 			if _, ok := h.Clients[client.PlayerID]; ok {
-				// Check if player exists before accessing
 				if player, playerExists := h.Players[client.PlayerID]; playerExists {
 					scoreboardUpdates := map[string]ScoreboardAction{
 						"scoreboardUpdates": {
@@ -108,20 +104,17 @@ func (h *GameHub) Run() {
 			h.BoardLock.Unlock()
 		case message := <-h.Broadcast:
 			h.BoardLock.RLock()
-			// Create a copy of clients to avoid holding lock while sending
 			clients := make([]*Client, 0, len(h.Clients))
 			for _, c := range h.Clients {
 				clients = append(clients, c)
 			}
 			h.BoardLock.RUnlock()
 
-			// Send messages without holding the lock to avoid deadlocks
 			for _, c := range clients {
 				select {
 				case c.Send <- message:
 				default:
 					log.Printf("Failed to send message to %s", c.PlayerID)
-					// Unregister in a non-blocking way
 					select {
 					case h.Unregister <- c:
 					default:
@@ -137,7 +130,6 @@ func (h *GameHub) Run() {
 	}
 }
 
-// BroadcastUpdates serializes and broadcasts updates to all connected clients
 func (h *GameHub) BroadcastUpdates(actionType string, payload any) {
 	if actionType == "" || payload == nil {
 		return
@@ -244,7 +236,6 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 	queue := [][]int{{x, y}}
 	scoreIncrement := 0
 
-	// Process initial cell
 	h.GameBoard.Cells[x][y].IsRevealed = true
 	if h.GameBoard.CellsToReveal > 0 {
 		h.GameBoard.CellsToReveal -= 1
@@ -261,14 +252,12 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 		Cell:     h.GameBoard.Cells[x][y],
 	})
 
-	// Process queue
 	for len(queue) > 0 {
 		cell := queue[0]
 		queue = queue[1:]
 		cellX, cellY := cell[0], cell[1]
 
 		if h.GameBoard.Cells[cellX][cellY].AdjacentMines == 0 {
-			// Check all neighbors
 			for oX := -1; oX <= 1; oX++ {
 				for oY := -1; oY <= 1; oY++ {
 					if oX == 0 && oY == 0 {
@@ -399,7 +388,6 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
 	gameBoardState.GameStatus = h.GameStatus
 
-	// Include all existing players in the game state
 	players := make([]Player, 0, len(h.Players))
 	for _, player := range h.Players {
 		players = append(players, *player)
@@ -413,12 +401,11 @@ func (h *GameHub) CheckWinCondition() {
 	if h.GameBoard.CellsToReveal == 0 {
 		h.GameStatus = Ended
 		h.BroadcastUpdates("GAME_STATUS", map[string]GameStatus{
-			"gameStatus": h.GameStatus,
+			"gameStatus": Ended,
 		})
 
 		log.Println("Game ended, will restart in 30 seconds")
 
-		// Start a goroutine to trigger restart after 30 seconds
 		go func() {
 			time.Sleep(30 * time.Second)
 			select {
@@ -430,17 +417,13 @@ func (h *GameHub) CheckWinCondition() {
 	}
 }
 
-// RestartGame resets the game board and starts a new game
 func (h *GameHub) RestartGame() {
-	// Generate a new game board
 	gameBoard := GenerateGameBoard()
 	h.GameBoard = *gameBoard
 
-	// Reset game status and start time
 	h.GameStatus = InProgress
 	h.StartTime = time.Now().Unix()
 
-	// Reset player scores
 	for _, player := range h.Players {
 		player.Score = 0
 		player.TotalMineHits = 0
@@ -449,12 +432,10 @@ func (h *GameHub) RestartGame() {
 
 	log.Println("Game restarted")
 
-	// Broadcast the new game state to all clients
 	payload := h.GetGameBoardState()
 	h.BroadcastUpdates("GAMEBOARD_STATE", payload)
 }
 
-// Shutdown returns the shutdown channel for graceful shutdown
 func (h *GameHub) Shutdown() chan struct{} {
 	return h.shutdown
 }

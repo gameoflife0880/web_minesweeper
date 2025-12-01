@@ -30,7 +30,6 @@ type GameHub struct {
 	StartTime  int64
 	GameStatus GameStatus
 
-	// Shutdown channel for graceful shutdown
 	shutdown chan struct{}
 }
 

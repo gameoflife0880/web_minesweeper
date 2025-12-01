@@ -63,7 +63,6 @@ func (c *Client) WritePump() {
 		case message, ok := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// Channel closed, send close message
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}

@@ -15,11 +15,11 @@ interface CellUpdate {
     y: number;
     playerID: string;
     cell: {
-        IsRevealed: boolean;
-        IsMine: boolean;
-        AdjacentMines: number;
-        FlagState: number;
-        FlagOwnerID: string;
+        isRevealed: boolean;
+        isMine: boolean;
+        adjacentMines: number;
+        flagState: number;
+        flagOwnerID: string;
     };
 }
 
@@ -81,11 +81,11 @@ const GameBoard = () => {
                                         ) {
                                             // Update the cell at the specified coordinates
                                             newCells[x][y] = {
-                                                IsRevealed: cell.IsRevealed,
-                                                IsMine: cell.IsMine,
-                                                AdjacentMines: cell.AdjacentMines,
-                                                FlagState: cell.FlagState,
-                                                FlagOwner: cell.FlagOwnerID ? cell.FlagOwnerID : undefined,
+                                                isRevealed: cell.isRevealed,
+                                                isMine: cell.isMine,
+                                                adjacentMines: cell.adjacentMines,
+                                                flagState: cell.flagState,
+                                                flagOwnerID: cell.flagOwnerID ? cell.flagOwnerID : undefined,
                                             };
                                         }
                                     });

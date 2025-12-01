@@ -2,11 +2,11 @@ import React from 'react';
 import './Cell.css';
 
 export interface CellData {
-    IsRevealed: boolean;
-    IsMine: boolean;
-    AdjacentMines: number;
-    FlagState: number; // 0 = Empty, 1 = Placed, 2 = Validated
-    FlagOwner?: string;
+    isRevealed: boolean;
+    isMine: boolean;
+    adjacentMines: number;
+    flagState: number; // 0 = Empty, 1 = Placed
+    flagOwnerID?: string;
 }
 
 interface CellProps {
@@ -16,22 +16,22 @@ interface CellProps {
 }
 
 const Cell: React.FC<CellProps> = React.memo(({ data, onClick, onRightClick }) => {
-    const { IsRevealed, IsMine, AdjacentMines, FlagState } = data;
+    const { isRevealed, isMine, adjacentMines, flagState } = data;
 
     let content: string | number = '';
     let className = 'cell';
 
-    if (IsRevealed) {
+    if (isRevealed) {
         className += ' revealed';
-        if (IsMine) {
+        if (isMine) {
             content = '💣';
             className += ' mine';
-        } else if (AdjacentMines > 0) {
-            content = AdjacentMines;
-            className += ` adj-${AdjacentMines}`;
+        } else if (adjacentMines > 0) {
+            content = adjacentMines;
+            className += ` adj-${adjacentMines}`;
         }
     } else {
-        if (FlagState === 1) {
+        if (flagState === 1) {
             content = '🚩';
             className += ' flagged';
         }
@@ -44,7 +44,7 @@ const Cell: React.FC<CellProps> = React.memo(({ data, onClick, onRightClick }) =
             onContextMenu={onRightClick}
             role="button"
             tabIndex={0}
-            aria-label={IsRevealed ? (IsMine ? 'Mine' : `Cell with ${AdjacentMines} adjacent mines`) : (FlagState === 1 ? 'Flagged cell' : 'Hidden cell')}
+            aria-label={isRevealed ? (isMine ? 'Mine' : `Cell with ${adjacentMines} adjacent mines`) : (flagState === 1 ? 'Flagged cell' : 'Hidden cell')}
         >
             {content}
         </div>
@@ -53,11 +53,11 @@ const Cell: React.FC<CellProps> = React.memo(({ data, onClick, onRightClick }) =
     // Custom comparison: only re-render if data actually changed
     // Note: onClick/onRightClick are still checked, but data is the primary concern
     return (
-        prevProps.data.IsRevealed === nextProps.data.IsRevealed &&
-        prevProps.data.IsMine === nextProps.data.IsMine &&
-        prevProps.data.AdjacentMines === nextProps.data.AdjacentMines &&
-        prevProps.data.FlagState === nextProps.data.FlagState &&
-        prevProps.data.FlagOwner === nextProps.data.FlagOwner &&
+        prevProps.data.isRevealed === nextProps.data.isRevealed &&
+        prevProps.data.isMine === nextProps.data.isMine &&
+        prevProps.data.adjacentMines === nextProps.data.adjacentMines &&
+        prevProps.data.flagState === nextProps.data.flagState &&
+        prevProps.data.flagOwnerID === nextProps.data.flagOwnerID &&
         prevProps.onClick === nextProps.onClick &&
         prevProps.onRightClick === nextProps.onRightClick
     );

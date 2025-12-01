@@ -4,8 +4,8 @@ import Cell, { type CellData } from './Cell';
 import './GameBoard.css';
 
 const GameStatus = {
-    InProgress: 'inProgress',
-    Ended: 'ended',
+    InProgress: 0,
+    Ended: 1,
 } as const;
 
 type GameStatus = typeof GameStatus[keyof typeof GameStatus];
@@ -54,11 +54,10 @@ const GameBoard = () => {
                     
                     switch (messageType) {
                         case "GAME_STATUS":
-                            // Handle game status updates
-                            if (payload?.status === GameStatus.Ended || payload?.status === GameStatus.InProgress) {
+                            if (payload?.gameStatus === GameStatus.Ended || payload?.gameStatus === GameStatus.InProgress) {
                                 setGameboardState(prevState => ({
                                     ...prevState,
-                                    gameStatus: payload.status as GameStatus,
+                                    gameStatus: payload.gameStatus as GameStatus,
                                 }));
                             }
                             break;

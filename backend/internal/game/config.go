@@ -6,6 +6,4 @@ const (
 
 	REVEAL_REWARD    = 1
 	MINE_HIT_PENALTY = 1000
-
-	ACTIVE_FLAG_LIMIT = 5
 )

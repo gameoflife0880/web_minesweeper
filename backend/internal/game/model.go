@@ -12,7 +12,6 @@ type GameConstants struct {
 	MinesMultiplier float32 `json:"minesMultiplier"`
 	RevealReward    int     `json:"revealReward"`
 	MineHitPenalty  int     `json:"mineHitPenalty"`
-	ActiveFlagLimit int     `json:"activeFlagLimit"`
 }
 
 type GameHub struct {

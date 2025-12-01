@@ -389,7 +389,6 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 		MinesMultiplier: MINES_MULTIPLIER,
 		RevealReward:    REVEAL_REWARD,
 		MineHitPenalty:  MINE_HIT_PENALTY,
-		ActiveFlagLimit: ACTIVE_FLAG_LIMIT,
 	}
 	gameBoardState.Cells = cells
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal

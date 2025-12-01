@@ -156,34 +156,27 @@ const GameBoard = () => {
     }, [gameboardState.cells, handleCellClick, handleCellRightClick]);
 
     return (
-        <>
-            {isConnected ? (
-                <div className="game-board-container">
-                    {cellsRender ? (
-                        gameboardState.gameStatus === GameStatus.Ended ? (
-                            <div className="game-over-screen">
-                                <div className="game-over-message">
-                                    <h2>Game Over</h2>
-                                    <p>The game has ended</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="game-board">
-                                {cellsRender}
-                            </div>
-                        )
-                    ) : (
-                        <div className="loading-message">
-                            <p>Waiting for game board...</p>
+        <div className="game-board-container">
+            {/* Game content - always rendered, not blocked by connection status */}
+            {cellsRender ? (
+                gameboardState.gameStatus === GameStatus.Ended ? (
+                    <div className="game-over-screen">
+                        <div className="game-over-message">
+                            <h2>Game Over</h2>
+                            <p>The game has ended</p>
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className="game-board">
+                        {cellsRender}
+                    </div>
+                )
             ) : (
-                <div className="connection-message">
-                    <h1>Connecting to server...</h1>
+                <div className="loading-message">
+                    <p>Waiting for game board...</p>
                 </div>
             )}
-        </>
+        </div>
     );
 };
 

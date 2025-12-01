@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 // --- Configuration ---
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8081/ws'; 
+const RECONNECT_INTERVAL = 3000; // 3 seconds between reconnection attempts
+const MAX_RECONNECT_ATTEMPTS = Infinity; // Keep trying indefinitely
 
 // --- Type Definitions ---
 
@@ -35,48 +37,141 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
 
     // useRef to hold the mutable WebSocket instance
     const wsRef = useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const reconnectAttemptsRef = useRef<number>(0);
+    const shouldReconnectRef = useRef<boolean>(true);
+    const isConnectingRef = useRef<boolean>(false);
 
-    // --- 1. Connection & Disconnection Logic ---
-    useEffect(() => {
+    // Connection function that can be called to establish or reconnect
+    const connect = useCallback(() => {
+        // Prevent multiple simultaneous connection attempts
+        if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        // Don't reconnect if we're already connected
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            return;
+        }
+
+        // Don't reconnect if we've been told to stop
+        if (!shouldReconnectRef.current) {
+            return;
+        }
+
+        isConnectingRef.current = true;
+
+        // Clean up existing connection if any
+        if (wsRef.current) {
+            try {
+                wsRef.current.close();
+            } catch (e) {
+                // Ignore errors during cleanup
+            }
+        }
+
         if (!token) {
             console.warn("No authentication token provided. Connecting without token.");
         }
 
         const connectionUrl = `${WS_URL}?token=${token}`;
 
-        // WebSocket instance is strongly typed
-        const ws = new WebSocket(connectionUrl);
-        wsRef.current = ws;
+        try {
+            // WebSocket instance is strongly typed
+            const ws = new WebSocket(connectionUrl);
+            wsRef.current = ws;
+            isConnectingRef.current = false;
 
-        // ON OPEN:
-        ws.onopen = () => {
-            setIsConnected(true);
-        };
+            // ON OPEN:
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                setIsConnected(true);
+                reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
+            };
 
-        // ON MESSAGE:
-        ws.onmessage = (event: MessageEvent) => {
-            // event.data is always a string from the server (JSON payload)
-            setMessageQueue(prevQueue => [...prevQueue, event.data as string]);
-        };
+            // ON MESSAGE:
+            ws.onmessage = (event: MessageEvent) => {
+                // event.data is always a string from the server (JSON payload)
+                setMessageQueue(prevQueue => [...prevQueue, event.data as string]);
+            };
 
-        // ON CLOSE:
-        ws.onclose = () => {
+            // ON CLOSE:
+            ws.onclose = (event: CloseEvent) => {
+                console.log('WebSocket closed', event.code, event.reason);
+                setIsConnected(false);
+                isConnectingRef.current = false;
+
+                // Attempt to reconnect if we should
+                if (shouldReconnectRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttemptsRef.current += 1;
+                    console.log(`Attempting to reconnect (attempt ${reconnectAttemptsRef.current})...`);
+                    
+                    // Clear any existing reconnect timeout
+                    if (reconnectTimeoutRef.current) {
+                        clearTimeout(reconnectTimeoutRef.current);
+                    }
+
+                    // Schedule reconnection attempt
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        connect();
+                    }, RECONNECT_INTERVAL);
+                }
+            };
+
+            // ON ERROR:
+            ws.onerror = (error: Event) => {
+                console.error('WebSocket Error:', error);
+                setIsConnected(false);
+                isConnectingRef.current = false;
+                // Note: onclose will be called after onerror, so reconnection logic is handled there
+            };
+        } catch (error) {
+            console.error('Failed to create WebSocket connection:', error);
+            isConnectingRef.current = false;
             setIsConnected(false);
-        };
 
-        // ON ERROR:
-        ws.onerror = (error: Event) => {
-            console.error('WebSocket Error:', error);
-            setIsConnected(false);
-        };
+            // Attempt to reconnect on error
+            if (shouldReconnectRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttemptsRef.current += 1;
+                console.log(`Attempting to reconnect after error (attempt ${reconnectAttemptsRef.current})...`);
+                
+                if (reconnectTimeoutRef.current) {
+                    clearTimeout(reconnectTimeoutRef.current);
+                }
+
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    connect();
+                }, RECONNECT_INTERVAL);
+            }
+        }
+    }, [token]);
+
+    // --- 1. Connection & Disconnection Logic ---
+    useEffect(() => {
+        shouldReconnectRef.current = true;
+        connect();
 
         // Cleanup: Runs when the hook/component unmounts or token changes
         return () => {
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                wsRef.current.close();
+            shouldReconnectRef.current = false; // Stop reconnection attempts
+            
+            // Clear any pending reconnection attempts
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+            }
+
+            // Close WebSocket connection
+            if (wsRef.current) {
+                try {
+                    wsRef.current.close();
+                } catch (e) {
+                    // Ignore errors during cleanup
+                }
+                wsRef.current = null;
             }
         };
-    }, [token]);
+    }, [connect]);
 
     // --- 2. Action Sending Function ---
     // The 'action' parameter is explicitly typed as GameAction

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import './GameStatusOverlay.css';
 
 interface GameStatusOverlayProps {
@@ -7,6 +7,7 @@ interface GameStatusOverlayProps {
     cellsToReveal: number;
     revealReward?: number;
     mineHitPenalty?: number;
+    gameStatus?: number;
 }
 
 const GameStatusOverlay = ({
@@ -15,12 +16,32 @@ const GameStatusOverlay = ({
     cellsToReveal,
     revealReward,
     mineHitPenalty,
+    gameStatus = 0,
 }: GameStatusOverlayProps) => {
     const [elapsedTime, setElapsedTime] = useState<number>(0);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastGameStartTimeRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
-        if (gameStartTime === undefined || gameStartTime === null) {
+        // Reset timer when gameStartTime changes (game restart)
+        if (gameStartTime !== undefined && gameStartTime !== null) {
+            if (lastGameStartTimeRef.current !== gameStartTime) {
+                setElapsedTime(0);
+                lastGameStartTimeRef.current = gameStartTime;
+            }
+        } else {
             setElapsedTime(0);
+            lastGameStartTimeRef.current = undefined;
+        }
+
+        // Clear any existing interval
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+
+        // Only run timer if game is in progress and we have a valid start time
+        if (gameStartTime === undefined || gameStartTime === null || gameStatus !== 0) {
             return;
         }
 
@@ -37,10 +58,15 @@ const GameStatusOverlay = ({
         updateElapsedTime();
 
         // Update every second
-        const interval = setInterval(updateElapsedTime, 1000);
+        intervalRef.current = setInterval(updateElapsedTime, 1000);
 
-        return () => clearInterval(interval);
-    }, [gameStartTime]);
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        };
+    }, [gameStartTime, gameStatus]);
 
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);

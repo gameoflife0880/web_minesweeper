@@ -270,6 +270,7 @@ const GameBoard = () => {
                 cellsToReveal={gameboardState.cellsToReveal}
                 revealReward={revealReward}
                 mineHitPenalty={mineHitPenalty}
+                gameStatus={gameboardState.gameStatus}
             />
             <Scoreboard players={players} />
             {/* Game content - always rendered, not blocked by connection status */}

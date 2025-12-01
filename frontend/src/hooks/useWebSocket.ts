@@ -1,10 +1,9 @@
 // src/hooks/useWebSocket.ts
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useGameStore } from './useGameStore'
 
 // --- Configuration ---
-const WS_URL = 'ws://localhost:8081/ws'; 
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8081/ws'; 
 
 // --- Type Definitions ---
 
@@ -22,6 +21,7 @@ interface WebSocketAPI {
     messageQueue: string[];
     sendAction: (action: CellAction) => void;
     clearMessageQueue: () => void;
+    removeProcessedMessages: (count: number) => void;
 }
 
 /**
@@ -38,9 +38,9 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
 
     // --- 1. Connection & Disconnection Logic ---
     useEffect(() => {
-        // if (!token) {
-        //     console.error("No authentication token provided.");
-        // }
+        if (!token) {
+            console.warn("No authentication token provided. Connecting without token.");
+        }
 
         const connectionUrl = `${WS_URL}?token=${token}`;
 
@@ -50,7 +50,6 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
 
         // ON OPEN:
         ws.onopen = () => {
-            console.log('WebSocket connected successfully.');
             setIsConnected(true);
         };
 
@@ -61,9 +60,8 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
         };
 
         // ON CLOSE:
-        ws.onclose = (event: CloseEvent) => {
+        ws.onclose = () => {
             setIsConnected(false);
-            console.log('WebSocket connection closed.', event);
         };
 
         // ON ERROR:
@@ -75,11 +73,10 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
         // Cleanup: Runs when the hook/component unmounts or token changes
         return () => {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                console.log('Closing WebSocket connection.');
                 wsRef.current.close();
             }
         };
-    }, []);
+    }, [token]);
 
     // --- 2. Action Sending Function ---
     // The 'action' parameter is explicitly typed as GameAction
@@ -101,11 +98,21 @@ export const useWebSocket = (token: string = ""): WebSocketAPI => {
         setMessageQueue([]);
     }, []);
 
+    const removeProcessedMessages = useCallback((count: number) => {
+        setMessageQueue(prevQueue => {
+            if (count >= prevQueue.length) {
+                return [];
+            }
+            return prevQueue.slice(count);
+        });
+    }, []);
+
     // --- 3. Return Values ---
     return {
         isConnected,
         messageQueue,
         sendAction,
         clearMessageQueue,
+        removeProcessedMessages,
     };
 };

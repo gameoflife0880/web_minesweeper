@@ -59,11 +59,11 @@ type Player struct {
 }
 
 type Cell struct {
-	IsRevealed    bool
-	IsMine        bool
-	AdjacentMines int
-	FlagState     FlagState
-	FlagOwnerID   string
+	IsRevealed    bool      `json:"isRevealed"`
+	IsMine        bool      `json:"isMine"`
+	AdjacentMines int       `json:"adjacentMines"`
+	FlagState     FlagState `json:"flagState"`
+	FlagOwnerID   string    `json:"flagOwnerID"`
 }
 
 type WebsocketAction struct {

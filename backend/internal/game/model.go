@@ -7,14 +7,12 @@ import (
 )
 
 type GameConstants struct {
-	GameStartTime      int64   `json:"gameStartTime"`
-	GameBoardSize      int     `json:"gameBoardSize"`
-	MinesMultiplier    float32 `json:"minesMultiplier"`
-	RevealReward       int     `json:"revealReward"`
-	FlagValidateReward int     `json:"flagValidateReward"`
-	FlagBadPenalty     int     `json:"flagBadPenalty"`
-	MineHitPenalty     int     `json:"mineHitPenalty"`
-	ActiveFlagLimit    int     `json:"activeFlagLimit"`
+	GameStartTime   int64   `json:"gameStartTime"`
+	GameBoardSize   int     `json:"gameBoardSize"`
+	MinesMultiplier float32 `json:"minesMultiplier"`
+	RevealReward    int     `json:"revealReward"`
+	MineHitPenalty  int     `json:"mineHitPenalty"`
+	ActiveFlagLimit int     `json:"activeFlagLimit"`
 }
 
 type GameHub struct {
@@ -97,7 +95,6 @@ type FlagState int
 const (
 	Empty FlagState = iota
 	Placed
-	Validated
 )
 
 type GameStatus int

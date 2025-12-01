@@ -180,7 +180,7 @@ func (h *GameHub) HandleCellAction(action CellAction) map[string][]any {
 }
 
 func (h *GameHub) CellReveal(x int, y int, playerID string) *UpdateResult {
-	if h.GameBoard.Cells[x][y].IsRevealed || h.GameBoard.Cells[x][y].FlagState != Empty {
+	if h.GameBoard.Cells[x][y].IsRevealed {
 		return nil
 	}
 
@@ -274,8 +274,7 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 
 					if isValidCoordinate(neighborX, neighborY) &&
 						!h.GameBoard.Cells[neighborX][neighborY].IsRevealed &&
-						!h.GameBoard.Cells[neighborX][neighborY].IsMine &&
-						h.GameBoard.Cells[neighborX][neighborY].FlagState == Empty {
+						!h.GameBoard.Cells[neighborX][neighborY].IsMine {
 						h.GameBoard.Cells[neighborX][neighborY].IsRevealed = true
 						if h.GameBoard.CellsToReveal > 0 {
 							h.GameBoard.CellsToReveal -= 1
@@ -317,7 +316,7 @@ func (h *GameHub) CellFlag(x int, y int, playerID string) *UpdateResult {
 		return nil
 	}
 
-	if h.GameBoard.Cells[x][y].IsRevealed || h.GameBoard.Cells[x][y].FlagState == Validated {
+	if h.GameBoard.Cells[x][y].IsRevealed {
 		return nil
 	}
 
@@ -331,9 +330,6 @@ func (h *GameHub) CellFlag(x int, y int, playerID string) *UpdateResult {
 
 	switch cell.FlagState {
 	case Empty:
-		if player.ActiveFlagCount >= ACTIVE_FLAG_LIMIT {
-			return updates
-		}
 		cell.FlagState = Placed
 		cell.FlagOwnerID = playerID
 		player.ActiveFlagCount += 1
@@ -388,14 +384,12 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	}
 
 	gameBoardState.GameConstants = GameConstants{
-		GameStartTime:      h.StartTime,
-		GameBoardSize:      GAMEBOARD_SIZE,
-		MinesMultiplier:    MINES_MULTIPLIER,
-		RevealReward:       REVEAL_REWARD,
-		FlagValidateReward: FLAG_VALIDATE_REWARD,
-		FlagBadPenalty:     FLAG_BAD_PENALTY,
-		MineHitPenalty:     MINE_HIT_PENALTY,
-		ActiveFlagLimit:    ACTIVE_FLAG_LIMIT,
+		GameStartTime:   h.StartTime,
+		GameBoardSize:   GAMEBOARD_SIZE,
+		MinesMultiplier: MINES_MULTIPLIER,
+		RevealReward:    REVEAL_REWARD,
+		MineHitPenalty:  MINE_HIT_PENALTY,
+		ActiveFlagLimit: ACTIVE_FLAG_LIMIT,
 	}
 	gameBoardState.Cells = cells
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal

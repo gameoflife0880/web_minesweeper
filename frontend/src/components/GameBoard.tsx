@@ -3,10 +3,18 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import Cell, { type CellData } from './Cell';
 import './GameBoard.css';
 
+const GameStatus = {
+    InProgress: 'inProgress',
+    Ended: 'ended',
+} as const;
+
+type GameStatus = typeof GameStatus[keyof typeof GameStatus];
+
 interface GameboardState {
     cells: CellData[][];
     cellsToReveal: number;
     gameConstants: Record<string, unknown>;
+    gameStatus: GameStatus;
 }
 
 interface CellUpdate {
@@ -23,13 +31,15 @@ interface CellUpdate {
     };
 }
 
-type GameStatus = 'in_progress' | 'ended';
-
 const GameBoard = () => {
     const { isConnected, messageQueue, sendAction, removeProcessedMessages } = useWebSocket();
 
-    const [gameboardState, setGameboardState] = useState<GameboardState>({} as GameboardState);
-    const [gameStatus, setGameStatus] = useState<GameStatus>('in_progress');
+    const [gameboardState, setGameboardState] = useState<GameboardState>({
+        cells: [],
+        cellsToReveal: 0,
+        gameConstants: {},
+        gameStatus: GameStatus.InProgress,
+    } as GameboardState);
 
     useEffect(() => {
         if (messageQueue.length > 0) {
@@ -45,8 +55,11 @@ const GameBoard = () => {
                     switch (messageType) {
                         case "GAME_STATUS":
                             // Handle game status updates
-                            if (payload?.status === "ended" || payload?.status === "in_progress") {
-                                setGameStatus(payload.status);
+                            if (payload?.status === GameStatus.Ended || payload?.status === GameStatus.InProgress) {
+                                setGameboardState(prevState => ({
+                                    ...prevState,
+                                    gameStatus: payload.status as GameStatus,
+                                }));
                             }
                             break;
                         case "GAMEBOARD_STATE":
@@ -54,6 +67,7 @@ const GameBoard = () => {
                                 cells: payload.cells,
                                 cellsToReveal: payload.cellsToReveal,
                                 gameConstants: payload.gameConstants,
+                                gameStatus: payload?.gameStatus ? (payload.gameStatus as GameStatus) : GameStatus.InProgress,
                             });
                             break;
                         case "CELL":
@@ -110,17 +124,17 @@ const GameBoard = () => {
     }, [messageQueue, removeProcessedMessages]);
 
     const handleCellClick = useCallback((x: number, y: number) => {
-        if (isConnected && gameStatus === 'in_progress') {
+        if (isConnected && gameboardState.gameStatus === GameStatus.InProgress) {
             sendAction({ type: "REVEAL", x, y });
         }
-    }, [isConnected, gameStatus, sendAction]);
+    }, [isConnected, gameboardState.gameStatus, sendAction]);
 
     const handleCellRightClick = useCallback((e: React.MouseEvent, x: number, y: number) => {
         e.preventDefault();
-        if (isConnected && gameStatus === 'in_progress') {
+        if (isConnected && gameboardState.gameStatus === GameStatus.InProgress) {
             sendAction({ type: "FLAG", x, y });
         }
-    }, [isConnected, gameStatus, sendAction]);
+    }, [isConnected, gameboardState.gameStatus, sendAction]);
 
     // Memoize the cells render to prevent unnecessary re-renders
     const cellsRender = useMemo(() => {
@@ -147,19 +161,18 @@ const GameBoard = () => {
             {isConnected ? (
                 <div className="game-board-container">
                     {cellsRender ? (
-                        <>
+                        gameboardState.gameStatus === GameStatus.Ended ? (
+                            <div className="game-over-screen">
+                                <div className="game-over-message">
+                                    <h2>Game Over</h2>
+                                    <p>The game has ended</p>
+                                </div>
+                            </div>
+                        ) : (
                             <div className="game-board">
                                 {cellsRender}
                             </div>
-                            {gameStatus === 'ended' && (
-                                <div className="game-over-overlay">
-                                    <div className="game-over-message">
-                                        <h2>Game Over</h2>
-                                        <p>The game has ended</p>
-                                    </div>
-                                </div>
-                            )}
-                        </>
+                        )
                     ) : (
                         <div className="loading-message">
                             <p>Waiting for game board...</p>

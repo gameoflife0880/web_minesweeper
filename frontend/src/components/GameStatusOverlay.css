@@ -58,3 +58,13 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(255, 68, 68, 0.4);
 }
 
+.restart-countdown-display {
+  display: flex;
+  align-items: center;
+}
+
+.status-restart {
+  color: #ffd700; /* bright yellow - high contrast */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(255, 215, 0, 0.4);
+}
+

@@ -419,8 +419,9 @@ func (h *GameHub) CheckWinCondition() {
 		h.GameStatus = Ended
 		restartTime := time.Now().Unix() + 30
 		h.RestartTime = restartTime
-		h.BroadcastUpdates("GAME_STATUS", map[string]GameStatus{
-			"gameStatus": Ended,
+		h.BroadcastUpdates("GAME_STATUS", map[string]any{
+			"gameStatus":  Ended,
+			"restartTime": restartTime,
 		})
 
 		log.Println("Game ended, will restart in 30 seconds")

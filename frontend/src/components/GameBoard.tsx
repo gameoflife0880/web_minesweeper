@@ -17,6 +17,7 @@ interface GameboardState {
     cellsToReveal: number;
     gameConstants: Record<string, unknown>;
     gameStatus: GameStatus;
+    restartTime?: number;
 }
 
 interface CellUpdate {
@@ -78,6 +79,7 @@ const GameBoard = () => {
                                 setGameboardState(prevState => ({
                                     ...prevState,
                                     gameStatus: payload.gameStatus as GameStatus,
+                                    restartTime: payload.restartTime !== undefined ? payload.restartTime : prevState.restartTime,
                                 }));
                             }
                             break;
@@ -87,6 +89,7 @@ const GameBoard = () => {
                                 cellsToReveal: payload.cellsToReveal,
                                 gameConstants: payload.gameConstants,
                                 gameStatus: payload?.gameStatus ? (payload.gameStatus as GameStatus) : GameStatus.InProgress,
+                                restartTime: payload.restartTime,
                             });
                             // Initialize players from gameboard state - replace entirely to match server state
                             if (payload.players && Array.isArray(payload.players)) {
@@ -448,6 +451,7 @@ const GameBoard = () => {
                 revealReward={revealReward}
                 mineHitPenalty={mineHitPenalty}
                 gameStatus={gameboardState.gameStatus}
+                restartTime={gameboardState.restartTime}
             />
             <Scoreboard players={players} />
             {/* Game content - always rendered, not blocked by connection status */}

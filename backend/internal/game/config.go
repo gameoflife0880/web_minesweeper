@@ -1,7 +1,7 @@
 package game
 
 const (
-	GAMEBOARD_SIZE   = 50
+	GAMEBOARD_SIZE   = 10
 	MINES_MULTIPLIER = 0.1
 
 	REVEAL_REWARD    = 1

@@ -393,13 +393,7 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	}
 	gameBoardState.Cells = cells
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
-
-	// Convert GameStatus enum to string
-	if h.GameStatus == Ended {
-		gameBoardState.GameStatus = "ended"
-	} else {
-		gameBoardState.GameStatus = "inProgress"
-	}
+	gameBoardState.GameStatus = h.GameStatus
 
 	return gameBoardState
 }
@@ -407,8 +401,8 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 func (h *GameHub) CheckWinCondition() {
 	if h.GameBoard.CellsToReveal == 0 {
 		h.GameStatus = Ended
-		h.BroadcastUpdates("GAME_STATUS", map[string]string{
-			"status": "ended",
+		h.BroadcastUpdates("GAME_STATUS", map[string]GameStatus{
+			"gameStatus": h.GameStatus,
 		})
 
 		log.Println("Game ended")

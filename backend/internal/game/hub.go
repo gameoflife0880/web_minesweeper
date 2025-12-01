@@ -394,6 +394,13 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	gameBoardState.Cells = cells
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
 
+	// Convert GameStatus enum to string
+	if h.GameStatus == Ended {
+		gameBoardState.GameStatus = "ended"
+	} else {
+		gameBoardState.GameStatus = "inProgress"
+	}
+
 	return gameBoardState
 }
 

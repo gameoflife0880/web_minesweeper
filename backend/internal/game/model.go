@@ -38,6 +38,7 @@ type GameBoard struct {
 	Cells         [][]Cell      `json:"cells"`
 	CellsToReveal int           `json:"cellsToReveal"`
 	GameConstants GameConstants `json:"gameConstants"`
+	GameStatus    string        `json:"gameStatus"`
 }
 
 type Client struct {

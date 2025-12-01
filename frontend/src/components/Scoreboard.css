@@ -1,0 +1,123 @@
+.scoreboard {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-width: 280px;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+.scoreboard-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    border-bottom: 1px solid #667eea;
+    padding-bottom: 0.25rem;
+}
+
+.scoreboard-empty {
+    text-align: center;
+    color: #666;
+    padding: 0.5rem;
+    font-style: italic;
+    font-size: 0.75rem;
+}
+
+.scoreboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.scoreboard-player {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.scoreboard-player:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.player-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.75rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-badge {
+    color: #999;
+    font-size: 0.75rem;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-right: 0.2rem;
+    opacity: 0.7;
+}
+
+.player-score {
+    color: #667eea;
+    font-weight: 700;
+    font-size: 0.8rem;
+    margin-left: auto;
+    flex-shrink: 0;
+    min-width: 40px;
+    text-align: right;
+}
+
+.player-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex-shrink: 0;
+}
+
+.stat-icon {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.stat-value {
+    color: #333;
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+/* Scrollbar styling */
+.scoreboard::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scoreboard::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.scoreboard::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.scoreboard::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+

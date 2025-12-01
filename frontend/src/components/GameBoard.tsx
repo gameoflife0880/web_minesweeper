@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import Cell, { type CellData } from './Cell';
+import Scoreboard, { type Player } from './Scoreboard';
 import './GameBoard.css';
 
 const GameStatus = {
@@ -31,6 +32,14 @@ interface CellUpdate {
     };
 }
 
+
+interface ScoreboardAction {
+    type: string;
+    value?: number;
+    playerID?: string;
+    player: Player;
+}
+
 const GameBoard = () => {
     const { isConnected, messageQueue, sendAction, removeProcessedMessages } = useWebSocket();
 
@@ -40,6 +49,9 @@ const GameBoard = () => {
         gameConstants: {},
         gameStatus: GameStatus.InProgress,
     } as GameboardState);
+
+    // Store players data for scoreboard
+    const [players, setPlayers] = useState<Map<string, Player>>(new Map());
 
     useEffect(() => {
         if (messageQueue.length > 0) {
@@ -109,6 +121,73 @@ const GameBoard = () => {
                                     };
                                 });
                             }
+                            
+                            // Handle scoreboard updates from cell actions
+                            if (payload.scoreboardUpdates && Array.isArray(payload.scoreboardUpdates)) {
+                                setPlayers(prevPlayers => {
+                                    const newPlayers = new Map(prevPlayers);
+                                    
+                                    payload.scoreboardUpdates.forEach((update: ScoreboardAction) => {
+                                        const playerID = update.playerID;
+                                        if (!playerID) return;
+                                        
+                                        const player = newPlayers.get(playerID);
+                                        if (!player) return;
+                                        
+                                        // Create updated player object
+                                        const updatedPlayer: Player = { ...player };
+                                        
+                                        switch (update.type) {
+                                            case "SCORE":
+                                                if (update.value !== undefined) {
+                                                    updatedPlayer.score = Math.max(0, updatedPlayer.score + update.value);
+                                                }
+                                                break;
+                                            case "MINE_HIT_INCREMENT":
+                                                updatedPlayer.totalMineHits += 1;
+                                                break;
+                                            case "FLAG_INCREMENT":
+                                                updatedPlayer.activeFlagCount += 1;
+                                                break;
+                                            case "FLAG_DECREMENT":
+                                                updatedPlayer.activeFlagCount = Math.max(0, updatedPlayer.activeFlagCount - 1);
+                                                break;
+                                        }
+                                        
+                                        newPlayers.set(playerID, updatedPlayer);
+                                    });
+                                    
+                                    return newPlayers;
+                                });
+                            }
+                            break;
+                        case "REGISTER":
+                            // Handle player registration
+                            if (payload?.scoreboardUpdates) {
+                                const scoreboardAction = payload.scoreboardUpdates as ScoreboardAction;
+                                if (scoreboardAction.player) {
+                                    setPlayers(prevPlayers => {
+                                        const newPlayers = new Map(prevPlayers);
+                                        newPlayers.set(scoreboardAction.player.playerID, scoreboardAction.player);
+                                        return newPlayers;
+                                    });
+                                    console.log(`Player registered: ${scoreboardAction.player.playerName} (${scoreboardAction.player.playerID})`);
+                                }
+                            }
+                            break;
+                        case "UNREGISTER":
+                            // Handle player unregistration
+                            if (payload?.scoreboardUpdates) {
+                                const scoreboardAction = payload.scoreboardUpdates as ScoreboardAction;
+                                if (scoreboardAction.player) {
+                                    setPlayers(prevPlayers => {
+                                        const newPlayers = new Map(prevPlayers);
+                                        newPlayers.delete(scoreboardAction.player.playerID);
+                                        return newPlayers;
+                                    });
+                                    console.log(`Player unregistered: ${scoreboardAction.player.playerName} (${scoreboardAction.player.playerID})`);
+                                }
+                            }
                             break;
                     }
                 } catch (e) {
@@ -157,6 +236,7 @@ const GameBoard = () => {
 
     return (
         <div className="game-board-container">
+            <Scoreboard players={players} />
             {/* Game content - always rendered, not blocked by connection status */}
             {cellsRender ? (
                 gameboardState.gameStatus === GameStatus.Ended ? (

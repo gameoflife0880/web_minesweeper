@@ -80,15 +80,14 @@ const GameBoard = () => {
                                 gameConstants: payload.gameConstants,
                                 gameStatus: payload?.gameStatus ? (payload.gameStatus as GameStatus) : GameStatus.InProgress,
                             });
-                            // Initialize players from gameboard state
+                            // Initialize players from gameboard state - replace entirely to match server state
                             if (payload.players && Array.isArray(payload.players)) {
-                                setPlayers(prevPlayers => {
-                                    const newPlayers = new Map(prevPlayers);
-                                    payload.players.forEach((player: Player) => {
-                                        newPlayers.set(player.playerID, player);
-                                    });
-                                    return newPlayers;
+                                const newPlayers = new Map<string, Player>();
+                                payload.players.forEach((player: Player) => {
+                                    newPlayers.set(player.playerID, player);
                                 });
+                                setPlayers(newPlayers);
+                                console.log(`Initialized ${newPlayers.size} players from gameboard state`);
                             }
                             break;
                         case "CELL":

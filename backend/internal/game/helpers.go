@@ -41,3 +41,20 @@ func applyScorePenalty(player *Player, penalty int) {
 		player.Score = 0
 	}
 }
+
+// removeFlagIfPresent removes a flag from a cell when it's being revealed
+// and updates the flag owner's activeFlagCount if needed
+func removeFlagIfPresent(h *GameHub, cell *Cell, updates *UpdateResult) {
+	if cell.FlagState == Placed && cell.FlagOwnerID != "" {
+		flagOwner, exists := h.Players[cell.FlagOwnerID]
+		if exists && flagOwner.ActiveFlagCount > 0 {
+			flagOwner.ActiveFlagCount -= 1
+			updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
+				Type:     "FLAG_DECREMENT",
+				PlayerID: cell.FlagOwnerID,
+			})
+		}
+		cell.FlagState = Empty
+		cell.FlagOwnerID = ""
+	}
+}

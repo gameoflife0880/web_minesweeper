@@ -196,7 +196,12 @@ func (h *GameHub) CellReveal(x int, y int, playerID string) *UpdateResult {
 func (h *GameHub) handleMineHit(x, y int, playerID string, player *Player) *UpdateResult {
 	updates := newUpdateResult()
 
-	h.GameBoard.Cells[x][y].IsRevealed = true
+	cell := &h.GameBoard.Cells[x][y]
+
+	// Remove flag if present before revealing
+	removeFlagIfPresent(h, cell, updates)
+
+	cell.IsRevealed = true
 
 	player.TotalMineHits += 1
 	applyScorePenalty(player, MINE_HIT_PENALTY)
@@ -206,7 +211,7 @@ func (h *GameHub) handleMineHit(x, y int, playerID string, player *Player) *Upda
 		X:        x,
 		Y:        y,
 		PlayerID: playerID,
-		Cell:     h.GameBoard.Cells[x][y],
+		Cell:     *cell,
 	})
 	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
 		Type:     "SCORE",
@@ -236,11 +241,16 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 	queue := [][]int{{x, y}}
 	scoreIncrement := 0
 
-	h.GameBoard.Cells[x][y].IsRevealed = true
+	cell := &h.GameBoard.Cells[x][y]
+
+	// Remove flag if present before revealing
+	removeFlagIfPresent(h, cell, updates)
+
+	cell.IsRevealed = true
 	if h.GameBoard.CellsToReveal > 0 {
 		h.GameBoard.CellsToReveal -= 1
 	}
-	score := calculateScore(h.GameBoard.Cells[x][y].AdjacentMines)
+	score := calculateScore(cell.AdjacentMines)
 	player.Score += score
 	scoreIncrement += score
 
@@ -249,7 +259,7 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 		X:        x,
 		Y:        y,
 		PlayerID: playerID,
-		Cell:     h.GameBoard.Cells[x][y],
+		Cell:     *cell,
 	})
 
 	for len(queue) > 0 {
@@ -269,11 +279,16 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 					if isValidCoordinate(neighborX, neighborY) &&
 						!h.GameBoard.Cells[neighborX][neighborY].IsRevealed &&
 						!h.GameBoard.Cells[neighborX][neighborY].IsMine {
-						h.GameBoard.Cells[neighborX][neighborY].IsRevealed = true
+						neighborCell := &h.GameBoard.Cells[neighborX][neighborY]
+
+						// Remove flag if present before revealing
+						removeFlagIfPresent(h, neighborCell, updates)
+
+						neighborCell.IsRevealed = true
 						if h.GameBoard.CellsToReveal > 0 {
 							h.GameBoard.CellsToReveal -= 1
 						}
-						score := calculateScore(h.GameBoard.Cells[neighborX][neighborY].AdjacentMines)
+						score := calculateScore(neighborCell.AdjacentMines)
 						player.Score += score
 						scoreIncrement += score
 
@@ -282,10 +297,10 @@ func (h *GameHub) CellFloodReveal(x int, y int, playerID string) *UpdateResult {
 							X:        neighborX,
 							Y:        neighborY,
 							PlayerID: playerID,
-							Cell:     h.GameBoard.Cells[neighborX][neighborY],
+							Cell:     *neighborCell,
 						})
 
-						if h.GameBoard.Cells[neighborX][neighborY].AdjacentMines == 0 {
+						if neighborCell.AdjacentMines == 0 {
 							queue = append(queue, []int{neighborX, neighborY})
 						}
 					}

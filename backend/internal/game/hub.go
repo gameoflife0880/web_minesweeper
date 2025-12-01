@@ -22,9 +22,10 @@ func NewGameHub() *GameHub {
 		Broadcast:         make(chan []byte, 256), // Buffered to prevent blocking
 		RestartTimer:      make(chan struct{}),
 
-		StartTime:  time.Now().Unix(),
-		GameStatus: InProgress,
-		shutdown:   make(chan struct{}),
+		StartTime:   time.Now().Unix(),
+		GameStatus:  InProgress,
+		RestartTime: 0,
+		shutdown:    make(chan struct{}),
 	}
 
 	return hub
@@ -402,6 +403,7 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	gameBoardState.Cells = cells
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
 	gameBoardState.GameStatus = h.GameStatus
+	gameBoardState.RestartTime = h.RestartTime
 
 	players := make([]Player, 0, len(h.Players))
 	for _, player := range h.Players {
@@ -415,6 +417,8 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 func (h *GameHub) CheckWinCondition() {
 	if h.GameBoard.CellsToReveal == 0 {
 		h.GameStatus = Ended
+		restartTime := time.Now().Unix() + 30
+		h.RestartTime = restartTime
 		h.BroadcastUpdates("GAME_STATUS", map[string]GameStatus{
 			"gameStatus": Ended,
 		})
@@ -438,6 +442,7 @@ func (h *GameHub) RestartGame() {
 
 	h.GameStatus = InProgress
 	h.StartTime = time.Now().Unix()
+	h.RestartTime = 0
 
 	for _, player := range h.Players {
 		player.Score = 0

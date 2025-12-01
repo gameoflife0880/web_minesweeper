@@ -27,8 +27,9 @@ type GameHub struct {
 	Broadcast         chan []byte
 	RestartTimer      chan struct{}
 
-	StartTime  int64
-	GameStatus GameStatus
+	StartTime   int64
+	GameStatus  GameStatus
+	RestartTime int64
 
 	shutdown chan struct{}
 }
@@ -39,6 +40,7 @@ type GameBoard struct {
 	GameConstants GameConstants `json:"gameConstants"`
 	GameStatus    GameStatus    `json:"gameStatus"`
 	Players       []Player      `json:"players"`
+	RestartTime   int64         `json:"restartTime"`
 }
 
 type Client struct {

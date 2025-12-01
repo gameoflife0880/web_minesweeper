@@ -1,16 +1,24 @@
 .game-board-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 6rem;
   height: 100%;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
-  overflow: hidden;
+  overflow: auto;
+  min-height: 100vh;
+  /* Hide scrollbars */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.game-board-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .connection-dot {
@@ -43,6 +51,7 @@
   border-color: #808080 #ffffff #ffffff #808080;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   border-radius: 4px;
+  margin: auto;
 }
 
 .game-board-row {

@@ -12,10 +12,7 @@ interface GameStatusOverlayProps {
 
 const GameStatusOverlay = ({
     gameStartTime,
-    gameBoardSize,
     cellsToReveal,
-    revealReward,
-    mineHitPenalty,
     gameStatus = 0,
 }: GameStatusOverlayProps) => {
     const [elapsedTime, setElapsedTime] = useState<number>(0);
@@ -70,14 +67,9 @@ const GameStatusOverlay = ({
     return (
         <div className="game-status-overlay">
             {gameStartTime !== undefined && (
-                <div>Elapsed: <span className="status-value status-time">{formatTime(elapsedTime)}</span></div>
-            )}
-            <div>To reveal: <span className="status-value status-cells">{`${cellsToReveal} cells`}</span></div>
-            {gameBoardSize !== undefined && (
-                <div>Board: <span className="status-value status-size">{`${gameBoardSize}x${gameBoardSize} (${gameBoardSize * gameBoardSize} cells)`}</span></div>
-            )}
-            {mineHitPenalty !== undefined && (
-                <div>Hit penalty: <span className="status-value status-penalty">{mineHitPenalty}</span></div>
+                <div className="elapsed-time-display">
+                    <span className="status-value status-time">{formatTime(elapsedTime)} <span className="status-value status-cells">{`${cellsToReveal} cells left`}</span></span>
+                </div>
             )}
         </div>
     );

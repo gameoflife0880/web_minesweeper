@@ -25,6 +25,7 @@ type GameHub struct {
 	Unregister        chan *Client
 	CellActionChannel chan CellAction
 	Broadcast         chan []byte
+	RestartTimer      chan struct{}
 
 	StartTime  int64
 	GameStatus GameStatus

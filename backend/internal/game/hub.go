@@ -21,6 +21,7 @@ func NewGameHub() *GameHub {
 		Unregister:        make(chan *Client),
 		CellActionChannel: make(chan CellAction),
 		Broadcast:         make(chan []byte, 256), // Buffered to prevent blocking
+		RestartTimer:      make(chan struct{}),
 
 		StartTime:  time.Now().Unix(),
 		GameStatus: InProgress,
@@ -128,6 +129,10 @@ func (h *GameHub) Run() {
 					}
 				}
 			}
+		case <-h.RestartTimer:
+			h.BoardLock.Lock()
+			h.RestartGame()
+			h.BoardLock.Unlock()
 		}
 	}
 }
@@ -411,8 +416,42 @@ func (h *GameHub) CheckWinCondition() {
 			"gameStatus": h.GameStatus,
 		})
 
-		log.Println("Game ended")
+		log.Println("Game ended, will restart in 30 seconds")
+
+		// Start a goroutine to trigger restart after 30 seconds
+		go func() {
+			time.Sleep(30 * time.Second)
+			select {
+			case h.RestartTimer <- struct{}{}:
+			default:
+				log.Println("RestartTimer channel full, skipping restart")
+			}
+		}()
 	}
+}
+
+// RestartGame resets the game board and starts a new game
+func (h *GameHub) RestartGame() {
+	// Generate a new game board
+	gameBoard := GenerateGameBoard()
+	h.GameBoard = *gameBoard
+
+	// Reset game status and start time
+	h.GameStatus = InProgress
+	h.StartTime = time.Now().Unix()
+
+	// Reset player scores
+	for _, player := range h.Players {
+		player.Score = 0
+		player.TotalMineHits = 0
+		player.ActiveFlagCount = 0
+	}
+
+	log.Println("Game restarted")
+
+	// Broadcast the new game state to all clients
+	payload := h.GetGameBoardState()
+	h.BroadcastUpdates("GAMEBOARD_STATE", payload)
 }
 
 // Shutdown returns the shutdown channel for graceful shutdown

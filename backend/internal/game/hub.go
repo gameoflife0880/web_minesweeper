@@ -22,7 +22,6 @@ func NewGameHub() *GameHub {
 		CellActionChannel: make(chan CellAction),
 		Broadcast:         make(chan []byte, 256), // Buffered to prevent blocking
 
-		ScanTicker: time.NewTicker(SCAN_INTERVAL),
 		StartTime:  time.Now().Unix(),
 		GameStatus: InProgress,
 		shutdown:   make(chan struct{}),
@@ -32,11 +31,9 @@ func NewGameHub() *GameHub {
 }
 
 // Run starts the game hub's main event loop, handling client registration,
-// cell actions, scan events, and broadcasts
+// cell actions, and broadcasts
 func (h *GameHub) Run() {
 	defer func() {
-		h.ScanTicker.Stop()
-
 		log.Println("GameHub stopped")
 	}()
 
@@ -104,20 +101,6 @@ func (h *GameHub) Run() {
 			h.BoardLock.Lock()
 			updates := h.HandleCellAction(cellAction)
 			h.BroadcastUpdates("CELL", updates)
-
-			h.CheckWinCondition()
-
-			h.BoardLock.Unlock()
-		case <-h.ScanTicker.C:
-			if h.GameStatus != InProgress {
-				continue
-			}
-
-			h.BoardLock.Lock()
-
-			updates := h.HandleScanAction()
-
-			h.BroadcastUpdates("SCAN", updates)
 
 			h.CheckWinCondition()
 
@@ -408,7 +391,6 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 		GameStartTime:      h.StartTime,
 		GameBoardSize:      GAMEBOARD_SIZE,
 		MinesMultiplier:    MINES_MULTIPLIER,
-		ScanInterval:       int(SCAN_INTERVAL.Seconds()),
 		RevealReward:       REVEAL_REWARD,
 		FlagValidateReward: FLAG_VALIDATE_REWARD,
 		FlagBadPenalty:     FLAG_BAD_PENALTY,
@@ -419,74 +401,6 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
 
 	return gameBoardState
-}
-
-func (h *GameHub) HandleScanAction() map[string][]any {
-	updates := newUpdateResult()
-
-	for i := range GAMEBOARD_SIZE {
-		for j := range GAMEBOARD_SIZE {
-			cell := &h.GameBoard.Cells[i][j]
-			if cell.FlagState != Placed {
-				continue
-			}
-
-			player, exists := h.Players[cell.FlagOwnerID]
-			if !exists {
-				continue
-			}
-
-			if cell.IsMine {
-				h.handleFlagValidated(i, j, player, updates)
-			} else {
-				h.handleFlagInvalid(i, j, player, updates)
-			}
-		}
-	}
-
-	return updates.toMap()
-}
-
-func (h *GameHub) handleFlagValidated(x, y int, player *Player, updates *UpdateResult) {
-	cell := &h.GameBoard.Cells[x][y]
-	cell.FlagState = Validated
-	player.Score += FLAG_VALIDATE_REWARD
-	player.ActiveFlagCount -= 1
-
-	updates.CellUpdates = append(updates.CellUpdates, CellAction{
-		Type: "FLAG_VALIDATED",
-		X:    x,
-		Y:    y,
-		Cell: *cell,
-	})
-	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
-		Type:     "SCORE",
-		Value:    FLAG_VALIDATE_REWARD,
-		PlayerID: player.PlayerID,
-	})
-	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
-		Type:     "FLAG_DECREMENT",
-		PlayerID: player.PlayerID,
-	})
-}
-
-func (h *GameHub) handleFlagInvalid(x, y int, player *Player, updates *UpdateResult) {
-	cell := &h.GameBoard.Cells[x][y]
-	cell.FlagState = Empty
-	applyScorePenalty(player, FLAG_BAD_PENALTY)
-	player.ActiveFlagCount -= 1
-
-	updates.CellUpdates = append(updates.CellUpdates, CellAction{
-		Type: "FLAG",
-		X:    x,
-		Y:    y,
-		Cell: *cell,
-	})
-	updates.ScoreboardUpdates = append(updates.ScoreboardUpdates, ScoreboardAction{
-		Type:     "SCORE",
-		Value:    -FLAG_BAD_PENALTY,
-		PlayerID: player.PlayerID,
-	})
 }
 
 func (h *GameHub) CheckWinCondition() {

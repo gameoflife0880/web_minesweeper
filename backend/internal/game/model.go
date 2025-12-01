@@ -2,7 +2,6 @@ package game
 
 import (
 	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -11,7 +10,6 @@ type GameConstants struct {
 	GameStartTime      int64   `json:"gameStartTime"`
 	GameBoardSize      int     `json:"gameBoardSize"`
 	MinesMultiplier    float32 `json:"minesMultiplier"`
-	ScanInterval       int     `json:"scanInterval"`
 	RevealReward       int     `json:"revealReward"`
 	FlagValidateReward int     `json:"flagValidateReward"`
 	FlagBadPenalty     int     `json:"flagBadPenalty"`
@@ -31,7 +29,6 @@ type GameHub struct {
 	CellActionChannel chan CellAction
 	Broadcast         chan []byte
 
-	ScanTicker *time.Ticker
 	StartTime  int64
 	GameStatus GameStatus
 

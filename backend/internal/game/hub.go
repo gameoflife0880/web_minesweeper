@@ -395,6 +395,13 @@ func (h *GameHub) GetGameBoardState() *GameBoard {
 	gameBoardState.CellsToReveal = h.GameBoard.CellsToReveal
 	gameBoardState.GameStatus = h.GameStatus
 
+	// Include all existing players in the game state
+	players := make([]Player, 0, len(h.Players))
+	for _, player := range h.Players {
+		players = append(players, *player)
+	}
+	gameBoardState.Players = players
+
 	return gameBoardState
 }
 

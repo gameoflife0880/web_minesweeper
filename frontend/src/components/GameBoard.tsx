@@ -80,6 +80,16 @@ const GameBoard = () => {
                                 gameConstants: payload.gameConstants,
                                 gameStatus: payload?.gameStatus ? (payload.gameStatus as GameStatus) : GameStatus.InProgress,
                             });
+                            // Initialize players from gameboard state
+                            if (payload.players && Array.isArray(payload.players)) {
+                                setPlayers(prevPlayers => {
+                                    const newPlayers = new Map(prevPlayers);
+                                    payload.players.forEach((player: Player) => {
+                                        newPlayers.set(player.playerID, player);
+                                    });
+                                    return newPlayers;
+                                });
+                            }
                             break;
                         case "CELL":
                             // Handle incremental cell updates

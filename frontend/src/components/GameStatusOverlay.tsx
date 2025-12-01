@@ -23,7 +23,6 @@ const GameStatusOverlay = ({
     const lastGameStartTimeRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
-        // Reset timer when gameStartTime changes (game restart)
         if (gameStartTime !== undefined && gameStartTime !== null) {
             if (lastGameStartTimeRef.current !== gameStartTime) {
                 setElapsedTime(0);
@@ -34,30 +33,24 @@ const GameStatusOverlay = ({
             lastGameStartTimeRef.current = undefined;
         }
 
-        // Clear any existing interval
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
 
-        // Only run timer if game is in progress and we have a valid start time
         if (gameStartTime === undefined || gameStartTime === null || gameStatus !== 0) {
             return;
         }
 
         const updateElapsedTime = () => {
-            // gameStartTime is in seconds (Unix timestamp)
-            // Date.now() returns milliseconds, so divide by 1000 to get seconds
             const now = Math.floor(Date.now() / 1000);
             const start = typeof gameStartTime === 'number' ? gameStartTime : 0;
             const elapsed = now - start;
             setElapsedTime(Math.max(0, elapsed));
         };
 
-        // Update immediately
         updateElapsedTime();
 
-        // Update every second
         intervalRef.current = setInterval(updateElapsedTime, 1000);
 
         return () => {

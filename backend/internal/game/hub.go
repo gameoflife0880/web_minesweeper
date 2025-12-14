@@ -188,13 +188,13 @@ func (h *GameHub) CellReveal(x int, y int, playerID string) *UpdateResult {
 	}
 
 	if h.GameBoard.Cells[x][y].IsMine {
-		return h.handleMineHit(x, y, playerID, player)
+		return h.HandleMineHit(x, y, playerID, player)
 	}
 
 	return h.CellFloodReveal(x, y, playerID)
 }
 
-func (h *GameHub) handleMineHit(x, y int, playerID string, player *Player) *UpdateResult {
+func (h *GameHub) HandleMineHit(x, y int, playerID string, player *Player) *UpdateResult {
 	updates := newUpdateResult()
 
 	cell := &h.GameBoard.Cells[x][y]

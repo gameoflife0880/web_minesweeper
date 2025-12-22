@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gameoflife0880/web_minesweeper/backend/internal/auth"
+	"github.com/gameoflife0880/web_minesweeper/backend/internal/db"
 	"github.com/gameoflife0880/web_minesweeper/backend/internal/game"
 	"github.com/gameoflife0880/web_minesweeper/backend/internal/handler"
 )
@@ -16,10 +18,23 @@ import (
 const PORT = "8081"
 
 func main() {
+	// Initialize database connection
+	mongoURI := os.Getenv("MONGO_URI")
+	if err := db.Init(mongoURI, ""); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
 	hub := game.NewGameHub()
 
 	go hub.Run()
 
+	// Auth routes
+	http.HandleFunc("/api/auth/register", auth.RegisterHandler)
+	http.HandleFunc("/api/auth/login", auth.LoginHandler)
+	http.HandleFunc("/api/auth/verify", auth.VerifyTokenHandler)
+
+	// WebSocket route
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		handler.ServeWs(hub, w, r)
 	})

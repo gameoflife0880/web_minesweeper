@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/gameoflife0880/web_minesweeper/backend/internal/auth"
 	"github.com/gameoflife0880/web_minesweeper/backend/internal/game"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -32,11 +33,21 @@ func ServeWs(hub *game.GameHub, w http.ResponseWriter, r *http.Request) {
 	var playerID string
 
 	token := r.URL.Query().Get("token")
-	if token == "" {
-		playerID = primitive.NewObjectID().Hex()
+	if token != "" {
+		// Validate token
+		claims, err := auth.ValidateToken(token)
+		if err == nil {
+			// Token is valid, use user ID as player ID
+			playerID = claims.UserID
+			log.Printf("Authenticated user connected: %s (ID: %s)", claims.Username, playerID)
+		} else {
+			log.Printf("Invalid token provided: %v. Creating guest connection", err)
+			playerID = primitive.NewObjectID().Hex()
+		}
 	} else {
+		// No token, create guest connection
 		playerID = primitive.NewObjectID().Hex()
-		log.Printf("Token provided but validation not implemented. New guest connected")
+		log.Printf("Guest user connected: %s", playerID)
 	}
 
 	client := &game.Client{
